@@ -4,7 +4,7 @@ import Collection from '../collection/redis.mjs'
 
 export class Tokens extends Collection {
   _serialize(token) {
-    const { client } = token
+    const { client, lastUse } = token
     if (client !== undefined) {
       const { id, ...rest } = client
       token.client_id = id

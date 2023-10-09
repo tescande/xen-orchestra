@@ -49,13 +49,23 @@ export default class {
     })
 
     // Token authentication provider.
-    this.registerAuthenticationProvider(async ({ token: tokenId }) => {
+    this.registerAuthenticationProvider(async ({ token: tokenId }, { ip } = {}) => {
       if (!tokenId) {
         return
       }
 
       try {
         const token = await app.getAuthenticationToken(tokenId)
+
+        this._tokens.update({
+          ...token,
+
+          lastUse: {
+            ip,
+            timestamp: Date.now(),
+          },
+        })
+
         return { expiration: token.expiration, userId: token.user_id }
       } catch (error) {}
     })
