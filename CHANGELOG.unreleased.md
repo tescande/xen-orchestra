@@ -53,6 +53,7 @@
 - @xen-orchestra/fs patch
 - @xen-orchestra/mixins minor
 - @xen-orchestra/xapi minor
+- xo-cli minor
 - xo-server minor
 - xo-server-backup-reports minor
 - xo-server-netbox patch
