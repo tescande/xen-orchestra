@@ -180,5 +180,6 @@
   "version": "Version",
   "vm-is-running": "The VM is running",
   "vms": "VMs",
+  "vm-count": "{n} VMs running",
   "xo-lite-under-construction": "XOLite is under construction"
 }
