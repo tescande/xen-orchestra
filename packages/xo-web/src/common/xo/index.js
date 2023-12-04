@@ -2237,17 +2237,21 @@ export const deletePifs = pifs =>
     body: _('deletePifsConfirm', { nPifs: pifs.length }),
   }).then(() => Promise.all(map(pifs, pif => _call('pif.delete', { pif: resolveId(pif) }))), noop)
 
-export const reconfigurePifIp = (pif, { mode, ip, netmask, gateway, dns }) =>
+export const reconfigurePifIp = (pif, { mode, ip, ipv6, ipv6Mode, netmask, gateway, dns }) =>
   _call('pif.reconfigureIp', {
     pif: resolveId(pif),
     mode,
     ip,
+    ipv6,
+    ipv6Mode,
     netmask,
     gateway,
     dns,
   })
 
 export const getIpv4ConfigModes = () => _call('pif.getIpv4ConfigurationModes')
+
+export const getIpv6ConfigModes = () => _call('pif.getIpv6ConfigurationModes')
 
 export const editPif = (pif, { vlan }) => _call('pif.editPif', { pif: resolveId(pif), vlan })
 
@@ -2589,7 +2593,7 @@ export const listVmBackups = remotes => _call('backupNg.listVmBackups', { remote
 export const restoreBackup = (
   backup,
   sr,
-  { generateNewMacAddresses = false, mapVdisSrs = {}, startOnRestore = false, useDifferentialRestore= false } = {}
+  { generateNewMacAddresses = false, mapVdisSrs = {}, startOnRestore = false, useDifferentialRestore = false } = {}
 ) => {
   const promise = _call('backupNg.importVmBackup', {
     id: resolveId(backup),

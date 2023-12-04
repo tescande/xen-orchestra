@@ -1072,6 +1072,7 @@ const messages = {
   pifConfigureIp: 'Configure IP address',
   configIpErrorTitle: 'Invalid parameters',
   configIpErrorMessage: 'IP address and netmask required',
+  configIpv6ErrorMessage: 'IP address required',
   staticIp: 'Static IP address',
   netmask: 'Netmask',
   dns: 'DNS',

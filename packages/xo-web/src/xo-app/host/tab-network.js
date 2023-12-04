@@ -26,6 +26,7 @@ import {
   editNetwork,
   editPif,
   getIpv4ConfigModes,
+  getIpv6ConfigModes,
   reconfigurePifIp,
   scanHostPifs,
 } from 'xo'
@@ -41,7 +42,10 @@ class ConfigureIpModal extends Component {
 
     const { pif } = props
     if (pif) {
-      this.state = pick(pif, ['ip', 'netmask', 'dns', 'gateway'])
+      this.state = {
+        ...pick(pif, ['ip', 'netmask', 'dns', 'gateway', 'primaryAddressType']),
+        ipv6: pif.ipv6?.[0],
+      }
     }
   }
 
@@ -50,7 +54,7 @@ class ConfigureIpModal extends Component {
   }
 
   render() {
-    const { ip, netmask, dns, gateway } = this.state
+    const { ip, ipv6, primaryAddressType, netmask, dns, gateway } = this.state
 
     return (
       <div>
@@ -58,6 +62,28 @@ class ConfigureIpModal extends Component {
           <Col size={6}>{_('staticIp')}</Col>
           <Col size={6}>
             <input className='form-control' onChange={this.linkState('ip')} value={ip} />
+          </Col>
+        </SingleLineRow>
+        &nbsp;
+        <SingleLineRow>
+          <Col size={6}>Static IPv6</Col>
+          <Col size={6}>
+            <input className='form-control' onChange={this.linkState('ipv6')} value={ipv6} />
+          </Col>
+        </SingleLineRow>
+        &nbsp;
+        <SingleLineRow>
+          <Col size={6}>Primary address type</Col>
+          <Col size={6}>
+            <select
+              className='form-control'
+              value={primaryAddressType}
+              onChange={v => this.setState({ primaryAddressType: v })}
+            >
+              {['IPv4', 'IPv6'].map(v => (
+                <option key={v}>{v}</option>
+              ))}
+            </select>
           </Col>
         </SingleLineRow>
         &nbsp;
@@ -111,14 +137,19 @@ const reconfigureIp = (pif, mode) => {
       title: _('pifConfigureIp'),
       body: <ConfigureIpModal pif={pif} />,
     }).then(params => {
-      if (!params.ip || !params.netmask) {
-        error(_('configIpErrorTitle'), _('configIpErrorMessage'))
-        return
+      if (params.ip === undefined && params.ipv6 === undefined) {
+        return // error(_('configIpErrorTitle'), _('configIpv6ErrorMessage'))
+      }
+      if (params.ip !== undefined && params.netmask === undefined) {
+        return // error(_('configIpErrorTitle'), _('configIpErrorMessage'))
+      }
+      if (params.ipv6 !== undefined) {
+        params.ipv6Mode = mode
       }
       return reconfigurePifIp(pif, { mode, ...params })
     }, noop)
   }
-  return reconfigurePifIp(pif, { mode })
+  return reconfigurePifIp(pif, { [pif.primaryAddressType === 'IPv6' ? 'ipv6Mode' : 'mode']: mode })
 }
 
 class PifItemIp extends Component {
@@ -126,7 +157,7 @@ class PifItemIp extends Component {
 
   render() {
     const { pif } = this.props
-    const pifIp = pif.ip
+    const pifIp = pif.primaryAddressType === 'IPv6' ? pif.ipv6?.[0] : pif.ip
     return (
       <div>
         {pifIp}{' '}
@@ -141,28 +172,43 @@ class PifItemIp extends Component {
 }
 
 class PifItemMode extends Component {
-  state = { configModes: [] }
+  state = { ipv4ConfigModes: [], ipv6ConfigModes: [] }
 
-  componentDidMount() {
-    getIpv4ConfigModes().then(configModes => this.setState({ configModes }))
+  async componentDidMount() {
+    const [ipv4ConfigModes, ipv6ConfigModes] = await Promise.all([getIpv4ConfigModes(), getIpv6ConfigModes()])
+    this.setState({ ipv4ConfigModes, ipv6ConfigModes })
   }
 
   _configIp = mode => mode != null && reconfigureIp(this.props.pif, mode.value)
 
+  _isIpv6 = createSelector(
+    () => this.props.pif.primaryAddressType,
+    primaryAddressType => primaryAddressType === 'IPv6'
+  )
+
   _getOptions = createSelector(
-    () => this.state.configModes,
-    configModes => configModes.map(mode => ({ label: mode, value: mode }))
+    this._isIpv6,
+    () => this.state.ipv4ConfigModes,
+    () => this.state.ipv6ConfigModes,
+    (isIpv6, ipv4ConfigModes, ipv6ConfigModes) =>
+      (isIpv6 ? ipv6ConfigModes : ipv4ConfigModes).map(mode => ({ label: mode, value: mode }))
   )
 
   _getValue = createSelector(
+    this._isIpv6,
     () => this.props.pif.mode,
-    mode => ({ label: mode, value: mode })
+    () => this.props.pif.ipv6Mode,
+    (isIpv6, mode, ipv6Mode) => {
+      mode = isIpv6 ? ipv6Mode : mode
+      return { label: mode, value: mode }
+    }
   )
 
   render() {
+    const isIpv6 = this._isIpv6()
     return (
       <Select onChange={this._configIp} options={this._getOptions()} value={this._getValue()}>
-        {this.props.pif.mode}
+        {this.props.pif[isIpv6 ? 'ipv6Mode' : 'mode']}
       </Select>
     )
   }
