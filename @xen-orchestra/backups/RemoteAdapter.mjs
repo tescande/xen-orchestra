@@ -253,7 +253,16 @@ export class RemoteAdapter {
     const handler = this._handler
 
     // this will delete the json, unused VHDs will be detected by `cleanVm`
-    await asyncMapSettled(backups, ({ _filename }) => handler.unlink(_filename))
+    await asyncMapSettled(backups, ({ _filename }) => Promise.all([
+      handler.unlink(_filename),
+      handler.unlink(_filename+'.immutable.json')
+        .catch(error=>{
+          if(error.code !== 'ENOENT'){
+            throw error
+          }
+        })
+      ])
+    )
 
     await this.#removeVmBackupsFromCache(backups)
   }
@@ -558,6 +567,14 @@ export class RemoteAdapter {
       await asyncMap(files, async file => {
         try {
           const metadata = await this.readVmBackupMetadata(file)
+          try{
+            const immutableData = JSON.parse(await this._handler.readFile(file+'.immutable.json',{ignoreEncryption: true}))
+            metadata.immutable = immutableData
+          }catch(error){
+            if(error.code !== 'ENOENT'){
+              throw error
+            }
+          }
           // inject an id usable by importVmBackupNg()
           metadata.id = metadata._filename
           backups[file] = metadata

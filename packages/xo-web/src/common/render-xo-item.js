@@ -646,6 +646,11 @@ const xoItemToRender = {
       <span className='tag tag-info' style={{ textTransform: 'capitalize' }}>
         {backup.mode}
       </span>{' '}
+      {backup.immutable && (
+        <span className='tag tag-info'>
+          <Icon icon='lock' />
+        </span>
+      )}{' '}
       <span className='tag tag-warning'>{backup.remote.name}</span>{' '}
       {backup.size !== undefined && <span className='tag tag-info'>{formatSize(backup.size)}</span>}{' '}
       <FormattedDate
