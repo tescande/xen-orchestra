@@ -43,7 +43,7 @@ class ConfigureIpModal extends Component {
     const { pif } = props
     if (pif) {
       this.state = {
-        ...pick(pif, ['ip', 'netmask', 'dns', 'gateway', 'primaryAddressType']),
+        ...pick(pif, ['ip', 'netmask', 'dns', 'gateway']),
         ipv6: pif.ipv6?.[0],
       }
     }
@@ -54,7 +54,7 @@ class ConfigureIpModal extends Component {
   }
 
   render() {
-    const { ip, ipv6, primaryAddressType, netmask, dns, gateway } = this.state
+    const { ip, ipv6, netmask, dns, gateway } = this.state
 
     return (
       <div>
@@ -69,21 +69,6 @@ class ConfigureIpModal extends Component {
           <Col size={6}>Static IPv6</Col>
           <Col size={6}>
             <input className='form-control' onChange={this.linkState('ipv6')} value={ipv6} />
-          </Col>
-        </SingleLineRow>
-        &nbsp;
-        <SingleLineRow>
-          <Col size={6}>Primary address type</Col>
-          <Col size={6}>
-            <select
-              className='form-control'
-              value={primaryAddressType}
-              onChange={v => this.setState({ primaryAddressType: v })}
-            >
-              {['IPv4', 'IPv6'].map(v => (
-                <option key={v}>{v}</option>
-              ))}
-            </select>
           </Col>
         </SingleLineRow>
         &nbsp;
