@@ -29,4 +29,6 @@
 
 <!--packages-start-->
 
+- xo-server-transport-slack patch
+
 <!--packages-end-->
