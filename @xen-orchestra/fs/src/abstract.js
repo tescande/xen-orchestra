@@ -280,9 +280,9 @@ export default class RemoteHandlerAbstract {
     return this._read(typeof file === 'string' ? normalizePath(file) : file, buffer, position)
   }
 
-  async __readFile(file, { flags = 'r' } = {}) {
+  async __readFile(file, { flags = 'r' , ignoreEncryption = false} = {}) {
     const data = await this._readFile(normalizePath(file), { flags })
-    return this.#encryptor.decryptData(data)
+    return ignoreEncryption ? data : this.#encryptor.decryptData(data)
   }
 
   async #rename(oldPath, newPath, { checksum }, createTree = true) {
