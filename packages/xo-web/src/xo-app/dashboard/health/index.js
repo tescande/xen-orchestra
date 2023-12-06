@@ -267,7 +267,7 @@ const CONTROL_DOMAIN_VDIS_ACTIONS = [
     level: 'danger',
   },
 ]
-
+// @todo add a check for schedule without full backup interval on a immutable remote
 const AttachedVdisTable = decorate([
   connectStore({
     pools: createGetObjectsOfType('pool'),

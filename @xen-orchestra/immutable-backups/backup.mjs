@@ -1,27 +1,16 @@
-import path from 'node:path'
+import path, { dirname } from 'node:path'
 import fs from 'node:fs/promises'
 import * as Vhd from './vhd.mjs'
 import * as File from './file.mjs'
+import  { createLogger } from '@xen-orchestra/log'
 
-
-export async function shouldBeImmutable(backup, immutabiltyDuration){ 
-    //  full  => true if backup is younger than immutabiltyDuration
-    //  incremental
-    //      if  delta 
-    //          get parent
-    //           ca't make a delta immutable if parent is mutable
-    //          return false if parent is not immutable
-    //      return true if backup is younger than immutability duration
-    //      // can't lift immutability if it means to unprotect a delta that should be protected
-    //      return  some(descendants in immutability duration)
-    
-
-}
+const { warn } = createLogger('xen-orchestra:immutable-backups:backup')
 
 export async function makeImmutable(metdataPath){
     try{
         const metadataDir = path.dirname(metdataPath)
         const metadata = JSON.parse(await fs.readFile(metdataPath))
+
         if(metadata.xva !== undefined){
             if(metadata.mode !== 'full'){
                 throw new Error(`got a backup with a xva path, but mode is not full ${metadata.mode}`)
@@ -34,14 +23,6 @@ export async function makeImmutable(metdataPath){
         } else if(metadata.vhds !== undefined){
             if(metadata.mode !== 'delta'){
                 throw new Error(`got a backup without a xva path, but mode is not delta ${metadata.mode}`)
-            }
-            if(metadata.type === 'delta'){
-                // get parent  backup
-                // can be expected when activating immutability on a remote
-                /*if(parentMetada.immutable !== true){
-                    warn(`${metdataPath} can't be made immutavle since its parent is not immutable`)
-                    return 
-                }*/
             }
             await Promise.all(
                 Object.values(metadata.vhds).map(vhdRelativePath=>{
@@ -59,12 +40,10 @@ export async function makeImmutable(metdataPath){
         console.log('write metadata')
         await fs.writeFile(metdataPath+'.immutable.json', JSON.stringify({
             since: + new Date(),
-            immutable: true, 
-            to: null
+            immutable: true
         }))
         console.log('make metadata immutable')
-        await 
-        Promise.all([
+        await Promise.all([
             File.makeImmutable(metdataPath),
             File.makeImmutable(metdataPath+'.immutable.json')
         ])
@@ -80,12 +59,33 @@ export async function makeImmutable(metdataPath){
             throw err
         }
     }
-    
-    
+}
+
+
+export async function liftFullBackupImmutability(metadataPath, backup){ 
+    const metadataDir = dirname(metadataPath)
+    console.log('make full backup mutable ',path.resolve(metadataDir, backup.xva))
+    await Promise.all([
+        File.liftImmutability(path.resolve(metadataDir, backup.xva)),
+        File.liftImmutability(path.resolve(metadataDir, backup.xva+'.checksum')).catch(console.warn),
+        File.makeImmutable(metadataPath),
+        File.makeImmutable(metadataPath+'.immutable.json')
+    ]) 
+    await fs.unlink(metadataPath+'.immutable.json')
+    await fs.unlink(path.resolve(dirname(metadataDir), 'cache.json.gz'))
 
 }
 
-// will only work if it's a full backup of it doesn't have any delta following
-// this will ensure immutability period won't be shorter than set
-// BUT it will lead to infinite chain if there is not full backup interval
-export async function liftImmutability(){}
+export async function liftIncrementalBackupImmutability(metadataPath,backup){
+    const metadataDir = dirname(metadataPath)
+    await Promise.all(
+        Object.values(backup.vhds).map(vhdRelativePath=>{
+            console.log('make vhd mutable ',path.resolve(metadataDir, vhdRelativePath))
+            return Vhd.liftImmutability(path.resolve(metadataDir, vhdRelativePath))
+        })
+    )
+    await File.liftImmutability(metadataPath)
+    await File.liftImmutability(metadataPath+'.immutable.json')
+    await fs.unlink(metadataPath+'.immutable.json')
+    await fs.unlink(path.resolve(dirname(metadataDir), 'cache.json.gz'))
+}

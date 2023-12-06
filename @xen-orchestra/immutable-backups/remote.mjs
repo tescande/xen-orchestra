@@ -1,63 +1,46 @@
 import fs from 'node:fs/promises' 
-import * as Backup from './backup.mjs'
+import * as Vm from './vm.mjs'
+import * as File from './file.mjs'
 import path from 'node:path'
 import  { createLogger } from '@xen-orchestra/log'
 
 const { warn } = createLogger('xen-orchestra:immutable-backups:remote')
 
-async function testRemote(remote){
-    // check if we have a valid remote path, 
-    // check if we can 
-    //  create a file
-    //  make it immutable
-    //  fail to modify it
-    //  fail to delete
-    //  make it mutable, 
-    //  modify it
-    //  delete it succesfully
-    // same tests on a directory
-}
+async function test(remote){
 
+    await fs.readdir(remote)
 
-async function watchVmDirectory(vmPath){
-    if(vmPath.endsWith('.lock')){
-        console.log(vmPath, ' is lock dir, skip')
-        return 
-    }
-    console.log('watchVmDirectory', vmPath)
-    try {
-        const watcher = fs.watch(vmPath);
-        for await (const {eventType, filename} of watcher){
-            if(eventType === 'change'){
-                continue
-            }
-            if(filename.startsWith('.')){
-                // temp file during upload
-                continue
-            }
-            console.log({eventType, filename})
-            // ignore modified metadata (merge , became immutable , deleted  )
+    const testPath = path.join(remote, '.test-immut')
+    // cleanup
+    try{
+        await File.liftImmutability(testPath)
+        await fs.unlink(testPath)
+    } catch(err){}
+    // can create , modify and delete a file 
+    await fs.writeFile(testPath,`test immut ${new Date()}`)
+    await fs.writeFile(testPath,`test immut change 1 ${new Date()}`)
+    await fs.unlink(testPath)
 
-            if(filename.endsWith('.json')){
-                console.log('is json')
-                const stat = await fs.stat(path.join(vmPath,filename))
-                if(stat.ctimeMs === stat.mtimeMs){
-                    console.log('just created')
-                    // only make immutable unmodified files
-                    await Backup.makeImmutable(path.join(vmPath,filename))
-                }
-            }
-        } 
-    }
-      catch (err) {
-        console.warn(err)
-        // must not throw and stop the script
-        // throw err;
-        if(err.code !== 'ENOENT' && err.code !== 'EPERM' /* delete on windows */){
-            watchVmDirectory(vmPath)
+    // cannot modify or delete an immutable file 
+    await fs.writeFile(testPath,`test immut ${new Date()}`)
+    await File.makeImmutable(testPath)
+    try{
+        await fs.writeFile(testPath,`test immut change 2  ${new Date()}`)
+        await fs.unlink(testPath)
+        throw new Error(`breach of contract : succeed in modifying and deleteing an immutable file`)
+    }catch(error){
+        if(error.code !== 'EPERM'){
+            throw error
         }
-      }
+    }
+    // can modify and delete a file after lifting immutability
+    await File.liftImmutability(testPath) 
+    await fs.writeFile(testPath,`test immut change 3 ${new Date()}`)
+    await fs.unlink(testPath)
 }
+
+
+
 
 
 async function watchForNewVm(vmPath){
@@ -66,7 +49,12 @@ async function watchForNewVm(vmPath){
 
         const watcher = fs.watch(vmPath);
         for await (const {filename} of watcher){
-            watchVmDirectory(path.join(vmPath, filename))
+            if(filename.endsWith('.lock')){
+                console.log(filename, ' is lock dir, skip')
+                continue 
+            }
+            // @todo : should only watch unwatched VM
+            Vm.watch(path.join(vmPath, filename))
                 .catch(()=>{})
         } 
     }catch(err){
@@ -75,75 +63,75 @@ async function watchForNewVm(vmPath){
         // throw err;
         if(err.code !== 'ENOENT'){
             // relaunch watcher on error
-            watchVmDirectory(vmPath)
+            Vm.watch(vmPath)
         }
 
     }
 }
 
-async function liftImmutability(remote){
-    // list all VMs
-    // list all backups : ensure we don't create cache files, since they 
-    // probably won't be deletable by XO later 
-    
-    // for each VM 
-    //  for each backup
-    //      shouldBeimmutable = await Backup.shouldBeImmutable(backup,)
-    //      with full hceck : should also check all the disk tree
-    //      isImmutable = backup.isImmutable
-    //      
-    //      if !backup.isImmutable && shouldBeImmutable
-    //           log error , this should have been handled by watcher 
-    //      if backup.isImmutable && !shouldBeImmutable
-    //          lift immutability
-}
-
-export async function watchRemote(remoteRootPath, duration, cronLiftImmutability){
-
-
-    await testRemote()
-
-
-    // add duration and watch status in the metadata.json of the remote 
-
-    // watch the remote for any new VM metadata json file
-    liftImmutability(remoteRootPath).catch(warn)
+async function liftImmutability(remoteRootPath, immutabilityDuration){
     const vmPath = path.join(remoteRootPath, 'xo-vm-backups')
-    console.log(vmPath)
-
-    watchForNewVm(vmPath).catch(warn)
-
-    // watch existing VM
     const vms = await fs.readdir(vmPath)
     console.log({vms})
     for(const vm of vms){
         console.log('watch ', vm)
-        watchVmDirectory(path.join(vmPath, vm))
-            .catch(()=>{})
+        Vm.liftImmutability(path.join(vmPath, vm), immutabilityDuration)
     }
+
+    // @todo : should also lift pool/xo  backups
+}
+
+export async function watchRemote(remoteRootPath, immutabilityDuration){
+
+    await test()
+
+    // add duration and watch status in the metadata.json of the remote 
+    await fs.writeFile(path.join(remoteRootPath,'immutable.json', JSON.stringify({
+        since: + new Date(),
+        immutable: true,
+        duration: immutabilityDuration
+    })))
+    // watch the remote for any new VM metadata json file
+    const vmPath = path.join(remoteRootPath, 'xo-vm-backups')
+
+    watchForNewVm(vmPath)
+
+    // watch existing VM
+    // @todo : should also lift pool/xo  backups
+    const vms = await fs.readdir(vmPath)
+    console.log({vms})
+    for(const vm of vms){
+        console.log('watch ', vm)
+        if(vmPath.endsWith('.lock')){
+            console.log(vmPath, ' is lock dir, skip')
+            continue 
+        }
+        Vm.watch(path.join(vmPath, vm))
+    }
+
+    setInterval(async ()=>{
+        await liftImmutability(remoteRootPath,immutabilityDuration)
+    }, 60*60*1000)
 }
 
 
-
-
-
 /**
- * This try to attain the "governance mode" of object locking
+ * This try to attains the "governance mode" of object locking
  * 
- * What does it protect you against
+ * What does it protect you against ? 
  *  deletion by user before the end of retention period
  *  
  * 
  * What does it left unprotected
  * 
- *  an attacker modifying the files during upload 
- *  an attacker modifying the files after a disk upload , but before the full upload of the backup
+ *  an user modifying the files during upload 
+ *  an user modifying the files after a disk upload , but before the full upload of the backup
  *  bit rot 
- * ====> theses 3 are mitigated by encryption. Bit rot can still occurs, but will be detected on restore
- *  an attacker with root access to your FS can lift immutability , and access the remote settings containing 
+ * ====> theses 3 are mitigated by authenticated encryption. Modification will be detected on restore and fail.
+ * 
+ *  an user with root access to your FS can lift immutability , and access the remote settings containing 
  *  the encryption key 
  * 
- * this is not enough to have compliance mode immutability
  */
 
 
