@@ -66,7 +66,7 @@ class ConfigureIpModal extends Component {
         </SingleLineRow>
         &nbsp;
         <SingleLineRow>
-          <Col size={6}>Static IPv6</Col>
+          <Col size={6}>{_('staticIpv6')}</Col>
           <Col size={6}>
             <input className='form-control' onChange={this.linkState('ipv6')} value={ipv6} />
           </Col>
@@ -123,10 +123,10 @@ const reconfigureIp = (pif, mode) => {
       body: <ConfigureIpModal pif={pif} />,
     }).then(params => {
       if (params.ip === undefined && params.ipv6 === undefined) {
-        return // error(_('configIpErrorTitle'), _('configIpv6ErrorMessage'))
+        return error(_('configIpErrorTitle'), _('ipRequired'))
       }
       if (params.ip !== undefined && params.netmask === undefined) {
-        return // error(_('configIpErrorTitle'), _('configIpErrorMessage'))
+        return error(_('configIpErrorTitle'), _('netmaskRequired'))
       }
       if (params.ipv6 !== undefined) {
         params.ipv6Mode = mode
