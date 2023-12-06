@@ -502,13 +502,15 @@ class Vm {
       exportedVmRef = vmRef
     }
     try {
-      const stream = await this.getResource(cancelToken, '/export/', {
-        query: {
-          ref: exportedVmRef,
-          use_compression: compress === 'zstd' ? 'zstd' : compress === true || compress === 'gzip' ? 'true' : 'false',
-        },
-        task: taskRef,
-      })
+      const stream = (
+        await this.getResource(cancelToken, '/export/', {
+          query: {
+            ref: exportedVmRef,
+            use_compression: compress === 'zstd' ? 'zstd' : compress === true || compress === 'gzip' ? 'true' : 'false',
+          },
+          task: taskRef,
+        })
+      ).body
 
       if (useSnapshot) {
         stream.once('end', destroySnapshot).once('error', destroySnapshot)

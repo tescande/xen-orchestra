@@ -245,7 +245,7 @@ export default class XapiStats {
           start: timestamp,
         },
       })
-      .then(response => response.text().then(JSON5.parse))
+      .then(response => response.body.text().then(JSON5.parse))
       .catch(err => {
         delete this.#hostCache[hostUuid][step]
         throw err
