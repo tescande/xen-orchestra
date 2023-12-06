@@ -1538,6 +1538,9 @@ export default {
   // Original text: 'Configure IP address'
   pifConfigureIp: undefined,
 
+  // Original text: 'Invalid parameters'
+  configIpErrorTitle: undefined,
+
   // Original text: 'Static IP address'
   staticIp: undefined,
 
