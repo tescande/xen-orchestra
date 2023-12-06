@@ -6,10 +6,11 @@ import  { createLogger } from '@xen-orchestra/log'
 
 const { warn } = createLogger('xen-orchestra:immutable-backups:backup')
 
-export async function makeImmutable(metdataPath){
+export async function makeImmutable(nonCryptedMetadataPath){
     try{
-        const metadataDir = path.dirname(metdataPath)
-        const metadata = JSON.parse(await fs.readFile(metdataPath))
+        // we can only read or modify non encrypted data 
+        const metadataDir = path.dirname(nonCryptedMetadataPath)
+        const metadata = JSON.parse(await fs.readFile(nonCryptedMetadataPath))
 
         if(metadata.xva !== undefined){
             if(metadata.mode !== 'full'){
@@ -34,19 +35,16 @@ export async function makeImmutable(metdataPath){
             throw new Error('File is not a metadata')
         }
         console.log('patch metadata')
-        // create a medata.json.immutability file, non encrypted
-        // that way we won't need the encryption key of the remote 
-        // update metadata
+
+        metadata.immutable = true
         console.log('write metadata')
-        await fs.writeFile(metdataPath+'.immutable.json', JSON.stringify({
-            since: + new Date(),
+        await fs.writeFile(nonCryptedMetadataPath, JSON.stringify({
+            ...metadata,
             immutable: true
+
         }))
         console.log('make metadata immutable')
-        await Promise.all([
-            File.makeImmutable(metdataPath),
-            File.makeImmutable(metdataPath+'.immutable.json')
-        ])
+        await  File.makeImmutable(nonCryptedMetadataPath)
         // purge cache
         console.log('snipe cache')
         await fs.unlink(path.resolve(metadataDir, 'cache.json.gz'))
@@ -69,9 +67,9 @@ export async function liftFullBackupImmutability(metadataPath, backup){
         File.liftImmutability(path.resolve(metadataDir, backup.xva)),
         File.liftImmutability(path.resolve(metadataDir, backup.xva+'.checksum')).catch(console.warn),
         File.makeImmutable(metadataPath),
-        File.makeImmutable(metadataPath+'.immutable.json')
+        File.makeImmutable(metadataPath+'.noncrypted.json')
     ]) 
-    await fs.unlink(metadataPath+'.immutable.json')
+    
     await fs.unlink(path.resolve(dirname(metadataDir), 'cache.json.gz'))
 
 }
@@ -85,7 +83,33 @@ export async function liftIncrementalBackupImmutability(metadataPath,backup){
         })
     )
     await File.liftImmutability(metadataPath)
-    await File.liftImmutability(metadataPath+'.immutable.json')
-    await fs.unlink(metadataPath+'.immutable.json')
+    await File.liftImmutability(metadataPath+'.noncrypted.json')
+    await fs.unlink(metadataPath+'.noncrypted.json')
     await fs.unlink(path.resolve(dirname(metadataDir), 'cache.json.gz'))
+}
+
+export function isIncrementalBackup({mode}){
+    return mode === 'delta'
+}
+
+export function isDifferencingBackup({mode, differentialVhds}){
+    if(mode !== 'delta'){
+        throw new Error(`a non incremental backup can't be a differencing`)
+    }
+    if( Object.values(differentialVhds).some(isDifferencing => isDifferencing)
+        && Object.values(differentialVhds).some(isDifferencing => !isDifferencing)
+    ){
+        warn('backup have both differencing and non differencing disks ')
+    }
+    // a differencing backup will have at least one differencing disk
+    return Object.values(differentialVhds).some(isDifferencing => isDifferencing)
+
+}
+
+export function isKeyBackup(backup){
+    // a key backup will have only full disks
+    return !isDifferencingBackup(backup)
+}
+export function isFullBackup({mode}){
+    return mode === 'full'
 }

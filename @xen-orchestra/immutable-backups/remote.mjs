@@ -86,7 +86,7 @@ export async function watchRemote(remoteRootPath, immutabilityDuration){
     await test()
 
     // add duration and watch status in the metadata.json of the remote 
-    await fs.writeFile(path.join(remoteRootPath,'immutable.json', JSON.stringify({
+    await fs.writeFile(path.join(remoteRootPath,'.immutable-settings.json', JSON.stringify({
         since: + new Date(),
         immutable: true,
         duration: immutabilityDuration

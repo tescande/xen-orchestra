@@ -22,5 +22,11 @@
     "@xen-orchestra/log": "^0.6.0",
     "execa": "^5.0.0",
     "vhd-lib": "^4.7.0"
+  },
+  "devDependencies": {
+    "tap": "^18.6.1"
+  },
+  "scripts": {
+    "test-integration": "tap  *.integ.mjs"
   }
 }

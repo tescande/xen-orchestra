@@ -16,9 +16,6 @@ function isVhdAlias(filename) {
   }
 
  async function resolveVhdAlias(filename) {
-    if (!isVhdAlias(filename)) {
-      return filename
-    } 
     const {size} = await fs.stat(filename)
     if (size > ALIAS_MAX_PATH_LENGTH) {
     // seems reasonnable for a relative path
@@ -35,19 +32,19 @@ function isVhdAlias(filename) {
   }
   
 export async function makeImmutable(vhdPath){
-    await File.makeImmutable(vhdPath)
-    // also make the target immutable
     if(vhdPath.endsWith('.alias.vhd')){
         const targetVhd = await resolveVhdAlias(vhdPath)
         await Directory.makeImmutable(targetVhd)
     }
+    await File.makeImmutable(vhdPath)
+    // also make the target immutable
 }
 
 export async function liftImmutability(vhdPath){
-    await File.liftImmutability(vhdPath)
-    // also make the target immutable
     if(vhdPath.endsWith('.alias.vhd')){
         const targetVhd = await resolveVhdAlias(vhdPath)
         await Directory.liftImmutability(targetVhd)
     }
+    await File.liftImmutability(vhdPath)
+    // also make the target immutable
 }

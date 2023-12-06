@@ -161,6 +161,7 @@ export class IncrementalRemoteWriter extends MixinRemoteWriter(AbstractIncrement
     )
 
     metadataContent = {
+      differentialVhds,
       jobId,
       mode: job.mode,
       scheduleId,
@@ -171,7 +172,7 @@ export class IncrementalRemoteWriter extends MixinRemoteWriter(AbstractIncrement
       vifs: deltaExport.vifs,
       vhds,
       vm,
-      vmSnapshot,
+      vmSnapshot
     }
     const { size } = await Task.run({ name: 'transfer' }, async () => {
       let transferSize = 0

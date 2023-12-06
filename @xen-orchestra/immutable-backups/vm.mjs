@@ -5,9 +5,9 @@ import  { createLogger } from '@xen-orchestra/log'
 import { dirname, join, resolve } from 'node:path'
 const { warn } = createLogger('xen-orchestra:immutable-backups:vm')
 
-const IMMUTABLE_SUFFIX = '.immutable.json'
+const NONCRYPTED_METADATA_SUFFIX = '.noncrypted.json'
 
-export async function canBeMadeImmutable(backupPath){ 
+export async function canBeMadeImmutable(backupPath){
     try {
     // only unmodified files 
     const stat = await fs.stat(backupPath)
@@ -22,12 +22,12 @@ export async function canBeMadeImmutable(backupPath){
 
     const list = {}
     fs.readdir(dirname((backupPath)))
-        .filter(filename=> filename.endsWith('.json') )
+        .filter(filename=> filename.endsWith(NONCRYPTED_METADATA_SUFFIX) )
         .sort()
         .map(file => resolve(dirname(backupPath), file))
         .forEach(file =>{
-            if(file.endsWith(IMMUTABLE_SUFFIX)){
-                const baseName = file.substring(0, file.length -IMMUTABLE_SUFFIX.length)
+            if(file.endsWith(NONCRYPTED_METADATA_SUFFIX)){
+                const baseName = file.substring(0, file.length -NONCRYPTED_METADATA_SUFFIX.length)
                 if(list[baseName] === undefined){
                     warn(`immutable file ${file} is present without backup data`,{file, baseName})
                     return 
@@ -89,8 +89,8 @@ export async function liftImmutability(basePath, immutabiltyDuration){
         .sort()
         .map(file => resolve(basePath, file))
         .forEach(file =>{
-            if(file.endsWith(IMMUTABLE_SUFFIX)){
-                const baseName = file.substring(0, file.length -IMMUTABLE_SUFFIX.length)
+            if(file.endsWith(NONCRYPTED_METADATA_SUFFIX)){
+                const baseName = file.substring(0, file.length -NONCRYPTED_METADATA_SUFFIX.length)
                 if(list[baseName] === undefined){
                     warn(`immutable file ${file} is present without backup data`,{file, baseName})
                     return 
@@ -150,8 +150,8 @@ export async function watch(vmPath){
             console.log({eventType, filename})
             // ignore modified metadata (merge , became immutable , deleted  )
 
-            if(filename.endsWith('.json')){
-                console.log('is json')
+            if(filename.endsWith('.noncrypted.json')){
+                console.log('is non crytped json')
                 const metadataPath = join(vmPath,filename)
                 const stat = await fs.stat(metadataPath)
                 if(stat.ctimeMs === stat.mtimeMs){
