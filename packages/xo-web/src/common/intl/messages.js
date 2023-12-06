@@ -1071,7 +1071,6 @@ const messages = {
   defaultLockingMode: 'Default locking mode',
   pifConfigureIp: 'Configure IP address',
   configIpErrorTitle: 'Invalid parameters',
-  configIpErrorMessage: 'IP address and netmask required',
   ipRequired: 'An IP address is required',
   netmaskRequired: 'Netmask required',
   staticIp: 'Static IP address',
