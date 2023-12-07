@@ -13,6 +13,7 @@
 - [REST API] _XO config & Pool metadata Backup_ jobs are available at `/backup/jobs/metadata`
 - [REST API] _Mirror Backup_ jobs are available at `/backup/jobs/metadata`
 - [Plugin/auth-saml] Add _Force re-authentication_ setting [Forum#67764](https://xcp-ng.org/forum/post/67764) (PR [#7232](https://github.com/vatesfr/xen-orchestra/pull/7232))
+- [Backup]Use multiple link to speedup NBD backup (PR [#7216](https://github.com/vatesfr/xen-orchestra/pull/7216))
 
 ### Bug fixes
 
