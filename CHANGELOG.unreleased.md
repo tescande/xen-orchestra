@@ -39,6 +39,7 @@
 
 - @xen-orchestra/backups patch
 - @xen-orchestra/xapi patch
+- vhd-lib minor
 - xo-server minor
 - xo-server-auth-saml minor
 
