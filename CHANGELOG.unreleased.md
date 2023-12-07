@@ -8,6 +8,7 @@
 > Users must be able to say: “Nice enhancement, I'm eager to test it”
 
 - [Forget SR] Changed the modal message and added a confirmation text to be sure the action is understood by the user [#7148](https://github.com/vatesfr/xen-orchestra/issues/7148) (PR [#7155](https://github.com/vatesfr/xen-orchestra/pull/7155))
+- [VDI] Create xapi task during NBD export for VHD format (PR [#7228](https://github.com/vatesfr/xen-orchestra/pull/7228))
 
 ### Bug fixes
 
@@ -28,5 +29,8 @@
 > Keep this list alphabetically ordered to avoid merge conflicts
 
 <!--packages-start-->
+
+- @xen-orchestra/xapi minor
+- vhd-lib minor
 
 <!--packages-end-->
