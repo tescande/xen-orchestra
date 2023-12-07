@@ -13,6 +13,7 @@
 - [REST API] _XO config & Pool metadata Backup_ jobs are available at `/backup/jobs/metadata`
 - [REST API] _Mirror Backup_ jobs are available at `/backup/jobs/metadata`
 - [Plugin/auth-saml] Add _Force re-authentication_ setting [Forum#67764](https://xcp-ng.org/forum/post/67764) (PR [#7232](https://github.com/vatesfr/xen-orchestra/pull/7232))
+- [Backup] Show if disk is differential or full in incremental backups (PR [#7222](https://github.com/vatesfr/xen-orchestra/pull/7222))
 
 ### Bug fixes
 
@@ -42,5 +43,6 @@
 - vhd-lib minor
 - xo-server minor
 - xo-server-auth-saml minor
+- xo-web patch
 
 <!--packages-end-->
