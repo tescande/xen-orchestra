@@ -113,3 +113,8 @@ export function isKeyBackup(backup){
 export function isFullBackup({mode}){
     return mode === 'full'
 }
+
+
+export function isImmutableBackup({_filename}){
+    return File.isImmutable(_filename)
+}

@@ -74,7 +74,7 @@ async function liftImmutability(remoteRootPath, immutabilityDuration){
     const vms = await fs.readdir(vmPath)
     console.log({vms})
     for(const vm of vms){
-        console.log('watch ', vm)
+        console.log('watliftImmutabilitych ', vm)
         Vm.liftImmutability(path.join(vmPath, vm), immutabilityDuration)
     }
 
@@ -112,9 +112,15 @@ export async function watchRemote(remoteRootPath, immutabilityDuration){
     setInterval(async ()=>{
         await liftImmutability(remoteRootPath,immutabilityDuration)
     }, 60*60*1000)
+
+
+    // @todo : shoulw also watch metadata and pool backups
 }
 
-
+async function deepCheck(){
+    // ensure all the files linked to a backup are in line with the json immutability status
+    // check if any immutable file has been modified 
+}
 /**
  * This try to attains the "governance mode" of object locking
  * 

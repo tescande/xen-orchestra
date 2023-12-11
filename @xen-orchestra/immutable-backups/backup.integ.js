@@ -15,4 +15,10 @@ describe('immutable-backups/backup', async()=>{
     it('really lock an incremental backup', async()=>{
     
     })
+    it('really detect full/incremental', async()=>{
+    
+    })
+    it('really detect key/delta in incremental', async()=>{
+    
+    })
 })

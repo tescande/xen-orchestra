@@ -2,135 +2,145 @@ import fs from 'node:fs/promises'
 
 import * as Backup from './backup.mjs'
 import  { createLogger } from '@xen-orchestra/log'
-import { dirname, join, resolve } from 'node:path'
+import { basename, dirname, join, resolve } from 'node:path'
+
 const { warn } = createLogger('xen-orchestra:immutable-backups:vm')
 
-const NONCRYPTED_METADATA_SUFFIX = '.noncrypted.json'
-
-export async function canBeMadeImmutable(backupPath){
-    try {
-    // only unmodified files 
-    const stat = await fs.stat(backupPath)
-    if(stat.ctimeMs !== stat.mtimeMs){
-        return false
-    }
-    const backupData = await fs.readFile(backupPath)
+ 
+export async function getBackupChain(backupPath){
+    const backupData = await fs.readFile(backupPath, 'utf-8')
     const backup = JSON.parse(backupData)
-    if(backup.mode === 'full'){
-        return true
-    }
-
-    const list = {}
-    fs.readdir(dirname((backupPath)))
-        .filter(filename=> filename.endsWith(NONCRYPTED_METADATA_SUFFIX) )
-        .sort()
-        .map(file => resolve(dirname(backupPath), file))
-        .forEach(file =>{
-            if(file.endsWith(NONCRYPTED_METADATA_SUFFIX)){
-                const baseName = file.substring(0, file.length -NONCRYPTED_METADATA_SUFFIX.length)
-                if(list[baseName] === undefined){
-                    warn(`immutable file ${file} is present without backup data`,{file, baseName})
-                    return 
-                }
-                list[baseName] = true
-            } else {
-                list[file] = false
-            }
-        }) 
-        .reverse()
-    const paths = Object.keys(list)
-    const mostRecentBackupPath = paths.shift()
-    if(mostRecentBackupPath !== backupPath){
-        // there are some more recent backup in this folder
-        // either the immutale process laggued or it crashed
-        // in both case it is unsafe to ignore it 
-        throw new Error(`More recent backup than ${backupPath} exists , like ${mostRecentBackupPath }`,{backupData, paths, last: mostRecentBackupPath})
-    }
-
-    // a full incremental without child can become immutable 
-    if(backup.type === 'full'){
-        return true
-    }
     
-    for(const [path, isImmutable] of Object.entries(list)){
-        const backupData = await fs.readFile(path)
-        const backup = JSON.parse(backupData)
-        if(backup.mode === 'full'){
-            // don't care of the past full backup
+    if(Backup.isFullBackup(backup)){
+        return{backup}
+    }
+
+    const paths = (await fs.readdir(dirname((backupPath))))
+        // only backup meytadata, no cache, or folder
+        .filter(filename=> filename.endsWith('.json'))
+        // sorted by newest first 
+        .sort()
+        .reverse()
+        // absolute path
+        .map(file => resolve(dirname(backupPath), file))
+    
+    let ancestors = []
+    let descendants = [] 
+    let foundTarget = false
+    for(const path of paths){
+        if(basename(path) === basename(backupPath)){
+            foundTarget = true
+            console.log('target is key', Backup.isKeyBackup(backup))
+            if(Backup.isKeyBackup(backup)){
+                break
+            }
             continue
         }
-        // mutable in the parent chain, can't make any descendant immutable  
-        if(isImmutable === false){
-            return false
+        const backupData = await fs.readFile(path, 'utf-8')
+        const otherBackup = JSON.parse(backupData)
+        if(otherBackup.jobId !== backup.jobId){
+            continue
         }
-        // that is a key backup of an incremental backup job
-        // no need to go back more 
-        if(backup.type === 'full'){
-            return isImmutable
-        }
-    }
-    // either we found a full, or we check all the backups
-    // the older incremental is a always full , even if the metadata says it's not
-    // since it have been merged with older full and incremental
-    // and the full chain was immutable
-    return true
+        console.log('check', path)
 
-    }catch(error){
-        warn(error)
-        return false
+        if(foundTarget){
+            console.log('WILL ADD', path, 'to ancestor')
+            ancestors.push(otherBackup)
+            if(Backup.isKeyBackup(otherBackup)){
+                break
+            } 
+        } else {
+            if(Backup.isKeyBackup(otherBackup)){
+                descendants = []
+            } else {
+                console.log('WILL ADD', path, 'to descendants')
+                descendants.push(otherBackup)
+            }
+        }
     }
+    return {ancestors, backup, descendants}
 }
 
 
-export async function liftImmutability(basePath, immutabiltyDuration){
-    const list = {}
-    fs.readdir(basePath)
-        .filter(filename=> filename.endsWith('.json') )
-        .sort()
-        .map(file => resolve(basePath, file))
-        .forEach(file =>{
-            if(file.endsWith(NONCRYPTED_METADATA_SUFFIX)){
-                const baseName = file.substring(0, file.length -NONCRYPTED_METADATA_SUFFIX.length)
-                if(list[baseName] === undefined){
-                    warn(`immutable file ${file} is present without backup data`,{file, baseName})
-                    return 
-                }
-                list[baseName] = true
-            } else {
-                list[file] = false
-            }
-        })
-        .reverse()
-    let chain = []
-    for( const [path, isImmutable] of Object.entries(list)){
-        if(!isImmutable){
-            continue // in theory we could break here
-        }
-        const backupData = await fs.readFile(path)
-        const backup = JSON.parse(backupData)
-        const stat = await fs.stat(path) 
-        if(backup.mode === 'full'){
-            if(new Date() - stat.ctimeMs > immutabiltyDuration){
-                await Backup.liftFullBackupImmutability(backup)
-            }
-            continue
-        }
+export async function canBeMadeImmutable(backupPath){
+    // only unmodified files 
+    const stat = await fs.stat(backupPath)
+    if(stat.ctime !== stat.mtime){
+        const error = new Error(`${backupPath} has already been modified`)
+        error.code = 'ALREADY_MODIFIED'
+        throw error 
+    }
 
-        chain.push({path, stat, backup})
-        if(backup.mode === 'full'){
-            if(new Date() - stat.ctimeMs > immutabiltyDuration){
-                await Promise.all(
-                    chain.map(({backup})=>Backup.liftIncrementalBackupImmutability(backup)) 
-                )
-            } 
-            // start a new chain 
-            chain =[] 
+    const {ancestors, backup, descendants} = await  getBackupChain(backupPath)
+    if(isFullBackup(backup)){
+        return true
+    }
+
+    if(descendants.length > 0 ){
+        const error = new Error(`file ${backupPath} is not the most recent backup of its job`)
+        error.code = 'HAS_DESCENDANTS'
+        throw error 
+    }
+
+    if(Backup.isKeyBackup(backup)){
+        return true
+    }
+
+    let ancestorBackup
+    while(ancestorBackup = ancestors.pop()){
+        if(!Backup.isImmutableBackup(ancestorBackup)){ 
+            const error = new Error(`ancestor ${ancestorBackup._fileName} of  ${backupPath} is mutable`)
+            error.code = 'ANCESTOR_IS_MUTABLE'
+            throw error    
+        }
+        if(Backup.isKeyBackup(ancestorBackup)){
+            return true
         }
     }
-    // handle the oldest chain 
-    await Promise.all(
-        chain.map(({backup})=>Backup.liftIncrementalBackupImmutability(backup)) 
-    )
+ 
+    throw new ErrorEvent(`How can we have a differential backup without any ancestor  key backup ${backupPath}`)
+}
+
+
+
+export async function liftImmutability(basePath, immutabiltyDuration){
+
+    // list all files olders than immutabiltyDuration
+    // check them from the older one to the more recent one 
+
+    const backupPaths = fs.readdir(basePath)
+        .filter(filename=> filename.endsWith('.json') )
+        .map(file => resolve(basePath, file))
+        .sort()
+ 
+
+    backupPaths.sort()
+
+    for(const path of backupPaths){
+        const stat = await fs.stat(path)
+        // too young to be mutable, not a problem
+        if(Date.now() - new Date(stat.ctimeMs) < immutabiltyDuration){
+            continue 
+        }
+        // already mutable
+        if(!await Backup.isImmutableBackup(path)){
+            continue
+        } 
+
+        // this may lead to reading multiple times the backups chains
+        // but immutability will  only be lifted
+        // when handling the most recent one of an incrementaljob
+        const {ancestors, backup, descendants} = await getBackupChain(path)
+        // can't lift immutability id descendants should still be protected
+        if(descendants?.length > 0 ){
+            continue
+        }
+        await Promise.all([
+            Backup.liftImmutability(backup), 
+            ...ancestors?.map(liftImmutability)
+        ])
+    }
+
 
 }
 
@@ -150,15 +160,18 @@ export async function watch(vmPath){
             console.log({eventType, filename})
             // ignore modified metadata (merge , became immutable , deleted  )
 
-            if(filename.endsWith('.noncrypted.json')){
-                console.log('is non crytped json')
+            if(filename.endsWith('.json')){
                 const metadataPath = join(vmPath,filename)
-                const stat = await fs.stat(metadataPath)
-                if(stat.ctimeMs === stat.mtimeMs){
-                    console.log('just created')
+                try{
+                    const stat = await fs.stat(metadataPath)
+                    if(stat.ctimeMs === stat.mtimeMs){
+                        console.log('just created')
                     if(await canBeMadeImmutable(metadataPath)){
                         await Backup.makeImmutable(metadataPath) 
                     }  
+                }
+                }catch(err){
+                    warn(err)
                 }
             }
         } 
@@ -167,8 +180,8 @@ export async function watch(vmPath){
         console.warn(err)
         // must not throw and stop the script
         // throw err;
-        if(err.code !== 'ENOENT' && err.code !== 'EPERM' /* delete on windows */){
+        //if(err.code !== 'ENOENT' && err.code !== 'EPERM' /* delete on windows */){
             watch(vmPath)
-        }
+        //}
       }
 }
