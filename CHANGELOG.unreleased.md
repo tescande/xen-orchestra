@@ -12,6 +12,7 @@
 - [REST API] _VM backup & Replication_ jobs have been moved from `/backup/jobs/:id` to `/backup/jobs/vm/:id` (redirections are in place for compatibility)
 - [REST API] _XO config & Pool metadata Backup_ jobs are available at `/backup/jobs/metadata`
 - [REST API] _Mirror Backup_ jobs are available at `/backup/jobs/metadata`
+- [HTTP] `http.useForwardedHeaders` setting can be unabled when XO is behind a reverse proxy to fetch clients IP addresses from `X-Forwarded-*` headers [Forum#67625](https://xcp-ng.org/forum/post/67625) (PR [#7233](https://github.com/vatesfr/xen-orchestra/pull/7233))
 
 ### Bug fixes
 
