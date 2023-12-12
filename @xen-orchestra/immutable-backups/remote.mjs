@@ -75,7 +75,10 @@ async function liftImmutability(remoteRootPath, immutabilityDuration){
     console.log({vms})
     for(const vm of vms){
         console.log('watliftImmutabilitych ', vm)
-        Vm.liftImmutability(path.join(vmPath, vm), immutabilityDuration)
+        Vm.liftImmutability(path.join(vmPath, vm), async path =>{
+            const {ctimeMs} = await fs.stat(path) 
+            return ctimeMs + immutabilityDuration < new Date()
+        })
     }
 
     // @todo : should also lift pool/xo  backups

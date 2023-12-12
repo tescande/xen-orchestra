@@ -1,13 +1,25 @@
 import { after, describe, it, before, mock } from 'node:test'
 import assert from 'node:assert/strict'
 import fs from 'node:fs/promises'
-import path from 'node:path'
+import path, { basename } from 'node:path'
 import { tmpdir } from 'node:os'
 import { rimraf } from 'rimraf'
 import { canBeMadeImmutable, getBackupChain, liftImmutability } from './vm.mjs'
 import * as Backup from './backup.mjs'
 import * as Directory from './directory.mjs'
 import * as File from './file.mjs' 
+
+async function touch(path){
+    
+    const time = new Date();
+    await fs.utimes(path, time, time).catch(async function (err) {
+        if ('ENOENT' !== err.code) {
+            throw err;
+        }
+        let fh = await fs.open(filename, 'a');
+        await fh.close();
+    });
+}
 
 
 describe('immutable-backups/vm/getBackupChain', async () => {
@@ -151,7 +163,8 @@ describe('immutable-backups/vm/liftImmutability', async () => {
         try {
 
             await Promise.all([
-                fs.writeFile(`${tmp}/1.json`, JSON.stringify({ mode: "full", jobId: 1 })), 
+                fs.writeFile(`${tmp}/1.xva`, 'I AM A XVA'), 
+                fs.writeFile(`${tmp}/1.json`, JSON.stringify({ mode: "full", jobId: 1, xva:'1.xva'})), 
                 fs.writeFile(`${tmp}/2.json`, JSON.stringify({ mode: "delta", jobId: 3, differentialVhds: { 1: false }, vhds: {} })),
                 fs.writeFile(`${tmp}/3.json`, JSON.stringify({ mode: "delta", jobId: 3, differentialVhds: { 1: true } , vhds: {}})),
                 fs.writeFile(`${tmp}/4.json`, JSON.stringify({ mode: "delta", jobId: 3, differentialVhds: { 1: true } , vhds: {}})),
@@ -170,7 +183,7 @@ describe('immutable-backups/vm/liftImmutability', async () => {
 
     it('does nothing if files are to recent', async ()=>{
         const files=['1', '2', '3','4', '5'  ]
-        await liftImmutability(tmp, 60*60*1000)
+        await liftImmutability(tmp, ()=> true)
         for(const file of files){
             assert.equal(await File.isImmutable(`${tmp}/${file}.json`), true)
         }
@@ -179,11 +192,25 @@ describe('immutable-backups/vm/liftImmutability', async () => {
 
     it('lift if files are old enough', async ()=>{
         const files=['1', '2', '3','4', '5'  ]
-        await liftImmutability(tmp,0)
+        await liftImmutability(tmp, ()=> false)
         for(const file of files){
+            console.log(`CHECK if immut is lifted${tmp}/${file}.json`, await File.isImmutable(`${tmp}/${file}.json`))
             assert.equal(await File.isImmutable(`${tmp}/${file}.json`), false)
         }
     })
 
+    it('do not lift the chains with at least one that should still be protected', async ()=>{
+        const files=['1', '2', '3','4', '5'  ]
+        await liftImmutability(tmp, async path=> {
+             
+            return basename(path) === '4.json'
+        })
+        for(const file of files){ 
+            // only the chain 2 3 4 will be immutable since 1 file of the chain should stay immutable
+            const isImmutable = await File.isImmutable(`${tmp}/${file}.json`)
+            const shouldBeImmutable =  ['2','3','4'].includes(file)
+            assert.equal(isImmutable,shouldBeImmutable)
+        }
+    })
 
 })

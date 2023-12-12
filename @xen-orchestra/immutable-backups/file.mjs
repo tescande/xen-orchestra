@@ -9,11 +9,11 @@ export async function makeImmutable(path){
 }
 
 export async function liftImmutability(path){
+    console.log('lift', path)
     return  execa('chattr', ['-i', path])
 }
 
 export async function isImmutable(path){
-    console.log({path})
     const {stdout} = await execa('lsattr', [path])
     const [flags] = stdout.split(' ')
     return flags.includes('i')

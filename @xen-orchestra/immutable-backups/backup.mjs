@@ -60,27 +60,34 @@ export async function makeImmutable(nonCryptedMetadataPath){
 }
 
 export async function liftImmutability(backup){
-    if(backup.type === 'full'){
+    if(backup.mode === 'full'){
         return liftFullBackupImmutability(backup)
-    } else if(backup.type === 'delta'){
+    } else if(backup.mode === 'delta'){
         return liftIncrementalBackupImmutability(backup)
     } else {
-        const error = new Error(`Type of backup ${backup.type} unknown`)
+        const error = new Error(`Type of backup ${backup.mode} unknown`)
         error.code = 'TYPE_UNKNWON'
         throw error
     }
 }
 
 async function liftFullBackupImmutability(backup){ 
-    const metadataDir = dirname(metadataPath)
+    const metadataDir = dirname(backup._filename)
     console.log('make full backup mutable ',path.resolve(metadataDir, backup.xva))
     await Promise.all([
         File.liftImmutability(path.resolve(metadataDir, backup.xva)),
         File.liftImmutability(path.resolve(metadataDir, backup.xva+'.checksum')).catch(console.warn),
-        File.makeImmutable(backup._filename),
+        File.liftImmutability(backup._filename),
     ]) 
     
-    await fs.unlink(path.resolve(dirname(metadataDir), 'cache.json.gz'))
+    try{
+        await fs.unlink(path.resolve(dirname(metadataDir), 'cache.json.gz'))
+    }catch(err){
+        if(err.code !== 'ENOENT'){
+            throw err
+        }
+    }
+
 
 }
 
@@ -94,7 +101,14 @@ async function liftIncrementalBackupImmutability(backup){
         })
     )
     await File.liftImmutability(metadataPath)
-    await fs.unlink(path.resolve(dirname(metadataDir), 'cache.json.gz'))
+    
+    try{
+        await fs.unlink(path.resolve(dirname(metadataDir), 'cache.json.gz'))
+    }catch(err){
+        if(err.code !== 'ENOENT'){
+            throw err
+        }
+    }
 }
 
 export function isIncrementalBackup({mode}){

@@ -32,7 +32,6 @@ export async function getBackupChain(backupPath){
     for(const path of paths){
         if(basename(path) === basename(backupPath)){
             foundTarget = true
-            console.log('target is key', Backup.isKeyBackup(backup))
             if(Backup.isKeyBackup(backup)){
                 break
             }
@@ -44,10 +43,8 @@ export async function getBackupChain(backupPath){
         if(otherBackup.jobId !== backup.jobId){
             continue
         }
-        console.log('check', path)
 
         if(foundTarget){
-            console.log('WILL ADD', path, 'to ancestor')
             ancestors.push(otherBackup)
             if(Backup.isKeyBackup(otherBackup)){
                 break
@@ -56,7 +53,6 @@ export async function getBackupChain(backupPath){
             if(Backup.isKeyBackup(otherBackup)){
                 descendants = []
             } else {
-                console.log('WILL ADD', path, 'to descendants')
                 descendants.push(otherBackup)
             }
         }
@@ -87,26 +83,27 @@ export async function canBeMadeImmutable(backupPath){
     let ancestorBackup
     while(ancestorBackup = ancestors.pop()){
         if(!await Backup.isImmutable(ancestorBackup)){ 
-            console.log('NOT IMMUT')
             const error = new Error(`ancestor ${ancestorBackup._fileName} of  ${backupPath} is mutable`)
             error.code = 'ANCESTOR_IS_MUTABLE'
             throw error    
         }
         if(Backup.isKeyBackup(ancestorBackup)){
-            console.log('OK ')
             return true
         }
-        console.log('#')
     }
-    console.log('LOLILOL')
  
     throw new ErrorEvent(`How can we have a differential backup without any ancestor  key backup ${backupPath}`)
 }
 
+/**
+ * 
+ * @param {*} basePath 
+ * @param {*} async isStillInImmutabilityPeriod(path) => true| false
+ */
 
+export async function liftImmutability(basePath, isStillInImmutabilityPeriod){
 
-export async function liftImmutability(basePath, immutabiltyDuration){
-
+    
     // list all files olders than immutabiltyDuration
     // check them from the older one to the more recent one 
 
@@ -117,17 +114,14 @@ export async function liftImmutability(basePath, immutabiltyDuration){
  
 
     backupPaths.sort()
-    console.log(backupPaths)
     for(const path of backupPaths){
-        const stat = await fs.stat(path)
-        // too young to be mutable, not a problem
-        if(Date.now() - new Date(stat.ctimeMs) < immutabiltyDuration){
-            continue 
-        }
         // already mutable
         if(!await File.isImmutable(path)){
             continue
         } 
+        if(await isStillInImmutabilityPeriod(path)){
+            continue
+        }
 
         // this may lead to reading multiple times the backups chains
         // but immutability will  only be lifted
@@ -135,10 +129,9 @@ export async function liftImmutability(basePath, immutabiltyDuration){
         const {ancestors, backup, descendants} = await getBackupChain(path)
         // can't lift immutability id descendants should still be protected
         if(descendants?.length > 0 ){
-            console.log('HAS DESCENDANT ')
             continue
         }
-        console.log('WILL LIFT ')
+        // make the full chain mutable
         await Promise.all([
             Backup.liftImmutability(backup), 
             ...(ancestors??[]).map(async ancestor => Backup.liftImmutability(ancestor))
