@@ -1,6 +1,7 @@
 import fs from 'node:fs/promises' 
 
 import * as Backup from './backup.mjs'
+import * as File from './file.mjs'
 import  { createLogger } from '@xen-orchestra/log'
 import { basename, dirname, join, resolve } from 'node:path'
 
@@ -10,6 +11,7 @@ const { warn } = createLogger('xen-orchestra:immutable-backups:vm')
 export async function getBackupChain(backupPath){
     const backupData = await fs.readFile(backupPath, 'utf-8')
     const backup = JSON.parse(backupData)
+    backup._filename = backupPath
     
     if(Backup.isFullBackup(backup)){
         return{backup}
@@ -38,6 +40,7 @@ export async function getBackupChain(backupPath){
         }
         const backupData = await fs.readFile(path, 'utf-8')
         const otherBackup = JSON.parse(backupData)
+        otherBackup._filename = path
         if(otherBackup.jobId !== backup.jobId){
             continue
         }
@@ -65,14 +68,9 @@ export async function getBackupChain(backupPath){
 export async function canBeMadeImmutable(backupPath){
     // only unmodified files 
     const stat = await fs.stat(backupPath)
-    if(stat.ctime !== stat.mtime){
-        const error = new Error(`${backupPath} has already been modified`)
-        error.code = 'ALREADY_MODIFIED'
-        throw error 
-    }
 
     const {ancestors, backup, descendants} = await  getBackupChain(backupPath)
-    if(isFullBackup(backup)){
+    if(Backup.isFullBackup(backup)){
         return true
     }
 
@@ -88,15 +86,19 @@ export async function canBeMadeImmutable(backupPath){
 
     let ancestorBackup
     while(ancestorBackup = ancestors.pop()){
-        if(!Backup.isImmutableBackup(ancestorBackup)){ 
+        if(!await Backup.isImmutable(ancestorBackup)){ 
+            console.log('NOT IMMUT')
             const error = new Error(`ancestor ${ancestorBackup._fileName} of  ${backupPath} is mutable`)
             error.code = 'ANCESTOR_IS_MUTABLE'
             throw error    
         }
         if(Backup.isKeyBackup(ancestorBackup)){
+            console.log('OK ')
             return true
         }
+        console.log('#')
     }
+    console.log('LOLILOL')
  
     throw new ErrorEvent(`How can we have a differential backup without any ancestor  key backup ${backupPath}`)
 }
@@ -108,14 +110,14 @@ export async function liftImmutability(basePath, immutabiltyDuration){
     // list all files olders than immutabiltyDuration
     // check them from the older one to the more recent one 
 
-    const backupPaths = fs.readdir(basePath)
+    const backupPaths = (await fs.readdir(basePath))
         .filter(filename=> filename.endsWith('.json') )
         .map(file => resolve(basePath, file))
         .sort()
  
 
     backupPaths.sort()
-
+    console.log(backupPaths)
     for(const path of backupPaths){
         const stat = await fs.stat(path)
         // too young to be mutable, not a problem
@@ -123,7 +125,7 @@ export async function liftImmutability(basePath, immutabiltyDuration){
             continue 
         }
         // already mutable
-        if(!await Backup.isImmutableBackup(path)){
+        if(!await File.isImmutable(path)){
             continue
         } 
 
@@ -133,11 +135,13 @@ export async function liftImmutability(basePath, immutabiltyDuration){
         const {ancestors, backup, descendants} = await getBackupChain(path)
         // can't lift immutability id descendants should still be protected
         if(descendants?.length > 0 ){
+            console.log('HAS DESCENDANT ')
             continue
         }
+        console.log('WILL LIFT ')
         await Promise.all([
             Backup.liftImmutability(backup), 
-            ...ancestors?.map(liftImmutability)
+            ...(ancestors??[]).map(async ancestor => Backup.liftImmutability(ancestor))
         ])
     }
 

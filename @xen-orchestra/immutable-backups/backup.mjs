@@ -59,22 +59,33 @@ export async function makeImmutable(nonCryptedMetadataPath){
     }
 }
 
+export async function liftImmutability(backup){
+    if(backup.type === 'full'){
+        return liftFullBackupImmutability(backup)
+    } else if(backup.type === 'delta'){
+        return liftIncrementalBackupImmutability(backup)
+    } else {
+        const error = new Error(`Type of backup ${backup.type} unknown`)
+        error.code = 'TYPE_UNKNWON'
+        throw error
+    }
+}
 
-export async function liftFullBackupImmutability(metadataPath, backup){ 
+async function liftFullBackupImmutability(backup){ 
     const metadataDir = dirname(metadataPath)
     console.log('make full backup mutable ',path.resolve(metadataDir, backup.xva))
     await Promise.all([
         File.liftImmutability(path.resolve(metadataDir, backup.xva)),
         File.liftImmutability(path.resolve(metadataDir, backup.xva+'.checksum')).catch(console.warn),
-        File.makeImmutable(metadataPath),
-        File.makeImmutable(metadataPath+'.noncrypted.json')
+        File.makeImmutable(backup._filename),
     ]) 
     
     await fs.unlink(path.resolve(dirname(metadataDir), 'cache.json.gz'))
 
 }
 
-export async function liftIncrementalBackupImmutability(metadataPath,backup){
+async function liftIncrementalBackupImmutability(backup){
+    const metadataPath= backup._filename
     const metadataDir = dirname(metadataPath)
     await Promise.all(
         Object.values(backup.vhds).map(vhdRelativePath=>{
@@ -83,8 +94,6 @@ export async function liftIncrementalBackupImmutability(metadataPath,backup){
         })
     )
     await File.liftImmutability(metadataPath)
-    await File.liftImmutability(metadataPath+'.noncrypted.json')
-    await fs.unlink(metadataPath+'.noncrypted.json')
     await fs.unlink(path.resolve(dirname(metadataDir), 'cache.json.gz'))
 }
 
@@ -115,6 +124,7 @@ export function isFullBackup({mode}){
 }
 
 
-export function isImmutableBackup({_filename}){
+export function isImmutable({_filename, ...other}){
+    console.log('BACKUP ', _filename, other)
     return File.isImmutable(_filename)
 }
