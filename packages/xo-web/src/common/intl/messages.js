@@ -2699,6 +2699,7 @@ const messages = {
   proxiesNeedUpgrade: 'Some proxies need to be upgraded.',
   upgradeNeededForProxies: 'Some proxies need to be upgraded. Click here to get more information.',
   xoProxyConcreteGuide: 'XO Proxy: a concrete guide',
+  proxiesMenuWarning: 'Some proxies have errors',
 
   // ----- Utils -----
   secondsFormat: '{seconds, plural, one {# second} other {# seconds}}',

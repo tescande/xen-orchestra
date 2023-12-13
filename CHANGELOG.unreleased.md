@@ -12,6 +12,7 @@
 - [REST API] _VM backup & Replication_ jobs have been moved from `/backup/jobs/:id` to `/backup/jobs/vm/:id` (redirections are in place for compatibility)
 - [REST API] _XO config & Pool metadata Backup_ jobs are available at `/backup/jobs/metadata`
 - [REST API] _Mirror Backup_ jobs are available at `/backup/jobs/metadata`
+- [XO web] Added a warning icon in _Proxies_ menu, if unable to check _Proxy_ upgrade
 
 ### Bug fixes
 
@@ -38,5 +39,6 @@
 
 - @xen-orchestra/xapi patch
 - xo-server minor
+- xo-web minor
 
 <!--packages-end-->
