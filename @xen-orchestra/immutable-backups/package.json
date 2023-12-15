@@ -18,6 +18,7 @@
     "node": ">=14.0.0"
   },
   "dependencies": {
+    "@vates/async-each": "^1.0.0",
     "@xen-orchestra/backups": "^0.44.2",
     "@xen-orchestra/log": "^0.6.0",
     "execa": "^5.0.0",
