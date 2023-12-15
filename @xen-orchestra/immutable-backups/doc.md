@@ -7,6 +7,7 @@ We target `governance` type of immutability, **the local root account of the rem
 We use the file system capabilities, they are tested on the protection process start.
 
 It is compatible with encryption at rest made by XO.
+
 The `protect` and `lift` processes must be run as root on the remote. On start, the protect process write into the remote `metadata.json` file its status (last protection applied, last protection lifted)
 
 ## Configuring
@@ -15,11 +16,7 @@ this package uses app-conf to store its config. The application name id `immutab
 
 ## Making a file immutable
 
-Creates a `.immutable` folder at the root of the remote if it does not exist
-
-when marking a file or a folder immutable, it create an alias file in `.immutable` containing the path to the folder/file and make this file also immutable.
-
-The watchin process
+when marking a file or a folder immutable, it create an alias file in `.immutable/<hash of full path>.<file|dir>.<extension>` containing the path to the folder/file and make this file also immutable.
 
 ## Lifting a file immutability
 
@@ -35,6 +32,20 @@ The watchin process
   - make the target mutable
   - delete the alias file
 - else : do not lift protection
+
+## Real time protecting
+
+On start, the watcher will create the `.immutable` folder at the root of the remote if it does not exists.
+It will also do a checkup to ensure immutability could work on this remote and handle the easiest issues.
+
+The watching process depends on the backup type, since we don't want to make temporary files and cache immutable.
+
+It won't protect files during upload, only when the files have been completly written on disk. Real time, in this case, means "protecting critical files as soon as they are uplaoded"
+
+This can be alleviated by :
+
+- Coupling immutability with encryption ensure the file is not modified
+- Making health check to ensure the data are exactly as the snapshot data
 
 ## Protecting XO backup
 
